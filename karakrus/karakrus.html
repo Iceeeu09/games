@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kara Krus Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="karakrus.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="topbar">
+        <div class="hero-header">
+            <h1>SUGAL HEROES</h1>
+        </div>
+        <div class="user-account-dropdown">
+            <button class="dropdown-toggle" id="userDropdownToggle">
+                <i class="fas fa-user-circle"></i>
+                <span id="headerUsername">Username</span>
+            </button>
+            <div class="dropdown-menu" id="myDropdown">
+                <div class="account-balance" id="userBalanceDisplay">Balance: $0.00</div>
+                <button class="top-up-button" id="topUpBtn">Top Up</button>
+                <button class="logout-button" id="logoutBtn">Log Out</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <!-- Left Panel -->
+            <div class="left-panel">
+                <h2>🎲 Kara Krus</h2>
+                <div class="user-info">
+                    Welcome, <span id="gameUsername">Guest</span>!
+                    <p>Balance: $<span id="gameBalance">0.00</span></p>
+                </div>
+                <div class="betting-area">
+                    <label for="betAmount">Bet Amount ($)</label>
+                    <input type="number" id="betAmount" min="1" value="10">
+                    <button id="flipCoinsBtn">Flip Coins!</button>
+                </div>
+                <button id="exitGameBtn" class="exit-btn">Exit Game</button>
+            </div>
+
+            <!-- Game Area -->
+            <section class="game-area">
+                <div class="coin-display-area">
+                    <p class="dealers-flip">Dealer's Flip:</p>
+                    <div class="coins">
+                        <img id="coin1Result" class="coin-result" src="">
+                        <img id="coin2Result" class="coin-result" src="">
+                    </div>
+                    <p id="gameMessage">Place your bet and flip the coins!</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Game Description Section -->
+        <section class="game-description">
+            <h3>DESCRIPTION</h3>
+            <p>
+                Kara Krus is an exciting coin-flip game where you bet on the outcome of two coins tossed by the dealer. Match the results to win big! Set your bet amount and test your luck!
+            </p>
+        </section>
+    </main>
+
+    <script>
+        // --- API Configuration ---
+        const API_BASE_URL = 'http://localhost/sugalhero-api';
+        let currentUserToken = null;
+        let currentBetAmount = 0;
+
+        // --- Helper function to update balance display on the page ---
+        async function updateBalanceDisplay() {
+            const balanceDisplays = document.querySelectorAll('#gameBalance, #userBalanceDisplay');
+            if (!balanceDisplays.length) {
+                console.error("Balance display elements not found!");
+                return;
+            }
+            if (!currentUserToken) {
+                balanceDisplays.forEach(el => el.textContent = 'N/A');
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE_URL}/user_balance.php`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${currentUserToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to fetch balance, token might be invalid or expired. Redirecting...');
+                    localStorage.removeItem('jwt_token');
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('username');
+                    window.location.href = '../../authentication/login.php';
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.success) {
+                    const balance = parseFloat(data.balance).toFixed(2);
+                    balanceDisplays.forEach(el => el.textContent = balance);
+                } else {
+                    console.error('API Error fetching balance:', data.message);
+                    if (data.message.includes('Unauthorized') || data.message.includes('token')) {
+                        localStorage.removeItem('jwt_token');
+                        localStorage.removeItem('user_id');
+                        localStorage.removeItem('username');
+                        window.location.href = '../../authentication/login.php';
+                    }
+                }
+            } catch (error) {
+                console.error('Network or Fetch Error fetching balance:', error);
+                localStorage.removeItem('jwt_token');
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('username');
+                window.location.href = '../../authentication/login.php';
+            }
+        }
+
+        // --- Helper function to display messages to the user ---
+        function displayGameMessage(message, type = 'info') {
+            const gameMessageElement = document.getElementById("gameMessage");
+            if (gameMessageElement) {
+                gameMessageElement.textContent = message;
+                gameMessageElement.style.color = {
+                    'info': 'white',
+                    'success': 'lightgreen',
+                    'error': 'red',
+                    'loss': 'red',
+                    'win': 'lightgreen',
+                    'draw': 'orange'
+                }[type] || 'white';
+            }
+        }
+
+        // --- Page Protection & Initial Data Load ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            const jwtToken = localStorage.getItem('jwt_token');
+            const username = localStorage.getItem('username');
+            const userId = localStorage.getItem('user_id');
+
+            if (!jwtToken || !username || !userId) {
+                console.log('No JWT token found. Redirecting to login...');
+                window.location.href = '../../authentication/login.php';
+                return;
+            }
+
+            currentUserToken = jwtToken;
+
+            // Display username
+            const usernameElements = document.querySelectorAll('#gameUsername, #headerUsername');
+            usernameElements.forEach(el => el.textContent = username);
+
+            await updateBalanceDisplay();
+
+            // --- Dropdown Toggle ---
+            const dropdownToggle = document.getElementById('userDropdownToggle');
+            const dropdownMenu = document.getElementById('myDropdown');
+            dropdownToggle.addEventListener('click', () => {
+                dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+            });
+
+            // --- Top Up Button (Placeholder) ---
+            document.getElementById('topUpBtn').addEventListener('click', () => {
+                alert('Top Up functionality not implemented yet.');
+            });
+
+            // --- Logout Button ---
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                localStorage.removeItem('jwt_token');
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('username');
+                window.location.href = '../../authentication/login.php';
+            });
+
+            // --- Exit Game Function ---
+            document.getElementById('exitGameBtn').addEventListener('click', () => {
+                window.location.href = '../../homepage/index.php';
+            });
+        });
+    </script>
+
+    <script src="karakrus.js"></script>
+</body>
+</html>

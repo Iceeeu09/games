@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stake Style Plinko</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="plinko.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="topbar">
+    <div class="hero-header">
+      <h1>SUGAL HEROES</h1>
+    </div>
+    <div class="user-account-dropdown">
+      <button class="dropdown-toggle" id="userDropdownToggle">
+        <i class="fas fa-user-circle"></i>
+        <span id="headerUsername">Username</span>
+      </button>
+      <div class="dropdown-menu" id="myDropdown">
+        <div class="account-balance" id="userBalanceDisplay">Balance: $0.00</div>
+        <button class="top-up-button" id="topUpBtn">Top Up</button>
+        <button class="logout-button" id="logoutBtn">Log Out</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="content-wrapper">
+
+      <!-- Left Panel -->
+      <div class="left-panel">
+        <h2>🎰 Plinko</h2>
+
+        <div class="user-info">
+          Welcome, <span id="gameUsername">Guest</span>!
+          <p>Balance: $<span id="gameBalance">0.00</span></p>
+        </div>
+
+        <label>Bet Amount ($)</label>
+        <input type="number" id="betAmount" min="1" value="10">
+
+        <label>Risk Level</label>
+        <select id="riskLevel">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        <button id="dropBallBtn">Drop Ball</button>
+        <div id="result"></div>
+
+        <button id="exitGameBtn" class="exit-btn">Exit Game</button>
+      </div>
+
+      <!-- Game Canvas -->
+      <section class="plinko-game-area">
+        <canvas id="plinkoCanvas"></canvas>
+        <div id="multipliers"></div>
+      </section>
+
+    </div> <!-- End of content-wrapper -->
+
+    <!-- Game Description Section -->
+    <section class="plinko-description">
+      <h3>DESCRIPTION</h3>
+      <p>
+        Plinko is a thrilling game of chance where a ball falls through pegs and lands in a multiplier slot. The slot you land on determines your reward. Adjust your bet and risk level to aim for the highest payout!
+      </p>
+    </section>
+  </main>
+</body>
+</html>
+
+
+  <script>
+    // --- API Configuration ---
+    const API_BASE_URL = 'http://localhost/sugalhero-api'; // Adjust if your API folder name is different
+</script>
+<script src="matter.min.js"></script>
+<script src="plinko.js"></script>
+
+<script>
+    // --- Page Protection & User Data Loading ---
+    let currentUserToken = null; // To be used by plinko.js for API calls
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const jwtToken = localStorage.getItem('jwt_token');
+        const username = localStorage.getItem('username');
+        const userId = localStorage.getItem('user_id');
+
+        if (!jwtToken || !username || !userId) {
+            // User is NOT logged in. Redirect to login page.
+            console.log('No JWT token found. Redirecting to login...');
+            // Adjust this path relative to your plinko.html
+            // e.g., '../../authentication/login.php' assumes games/ is sibling to authentication/
+            window.location.href = '../../authentication/login.php';
+            return; // Stop further script execution
+        }
+
+        // Store token globally for plinko.js to access
+        currentUserToken = jwtToken;
+
+        // Display username
+        document.getElementById('gameUsername').textContent = username;
+
+        // Now, fetch the actual balance using the API
+        try {
+            const response = await fetch(`${API_BASE_URL}/user_balance.php`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${jwtToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                // Token might be expired or invalid. Redirect to login.
+                console.error('Failed to fetch balance, token might be invalid or expired. Redirecting...');
+                localStorage.removeItem('jwt_token');
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('username');
+                window.location.href = '../../authentication/login.php'; // Adjust path
+                return;
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('gameBalance').textContent = parseFloat(data.balance).toFixed(2);
+            } else {
+                console.error('API Error fetching balance:', data.message);
+                // For critical errors (e.g., unauthorized API response), redirect.
+                if (data.message.includes('Unauthorized') || data.message.includes('token')) {
+                    localStorage.removeItem('jwt_token');
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('username');
+                    window.location.href = '../../authentication/login.php'; // Adjust path
+                }
+            }
+        } catch (error) {
+            console.error('Network or Fetch Error fetching balance:', error);
+            // Network error usually means backend is down or CORS. Redirect to login is safe.
+            localStorage.removeItem('jwt_token');
+            localStorage.removeItem('user_id');
+            localStorage.removeItem('username');
+            window.location.href = '../../authentication/login.php'; // Adjust path
+        }
+    });
+
+    // --- Exit Game Function ---
+    document.getElementById('exitGameBtn').addEventListener('click', () => {
+        // Redirect to your homepage
+        // Adjust this path relative to your plinko.html
+        window.location.href = '../../homepage/index.php';
+    });
+  </script>
+
+  <script src="matter.min.js"></script>
+  <script src="plinko.js"></script>
+</body>
+</html>
